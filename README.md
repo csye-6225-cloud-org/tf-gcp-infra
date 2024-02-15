@@ -1,4 +1,4 @@
 # tf-gcp-infra
 
-## APIs enabled
+## APIs enabled on GCP
 Compute Engine API
