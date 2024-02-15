@@ -29,7 +29,8 @@ jobs:
 
     # Create gcp-creds.json and populate it using github repo secret
     - name: Configure GCP creds
-      run: echo ${{ secrets.GCP_CREDS }} > gcp-creds.json
+      run: touch gcp-creds.json
+    - run: echo ${{ secrets.GCP_CREDS }} > gcp-creds.json
 
 
     # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
