@@ -1,3 +1,6 @@
+# GCP creds
+gcp-creds.json
+
 # Local .terraform directories
 **/.terraform/*
 
