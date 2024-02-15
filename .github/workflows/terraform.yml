@@ -32,8 +32,6 @@ jobs:
       run: |
         touch gcp-creds.json
         echo "${{ secrets.GCP_CREDS }}" > gcp-creds.json
-        cat gcp-creds.json
-
 
     # Initialize a new or existing Terraform working directory by creating initial files, loading any remote state, downloading modules, etc.
     - name: Terraform Init
