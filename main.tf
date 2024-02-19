@@ -14,7 +14,7 @@ provider "google" {
 
 resource "google_compute_network" "vpc_network" {
   count                           = length(var.vpc_names)
-  name                            = var.vpc_names[count.index]
+  #  name                            = var.vpc_names[count.index]
   project                         = var.gcp_project
   auto_create_subnetworks         = false
   routing_mode                    = "REGIONAL"
