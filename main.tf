@@ -8,8 +8,8 @@ terraform {
 }
 
 provider "google" {
-  credentials = "/Users/anuraag/.config/gcloud/application_default_credentials.json"
-  # credentials = "gcp-creds.json"
+  # credentials = "/Users/anuraag/.config/gcloud/application_default_credentials.json"
+  credentials = "gcp-creds.json"
   project = var.gcp_project
   region  = var.region
 }
