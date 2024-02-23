@@ -45,3 +45,45 @@ variable "firewall" {
   type    = list(any)
   default = ["172.16.0.0/24", "172.16.1.0/24"]
 }
+
+variable "webapp_tags"{
+  type = list(any)
+  default = ["webapp-server"]
+}
+variable "webapp_image"{
+  type = string
+  default = "csye-6225-image-1708635565"
+}
+variable "webapp_type"{
+  type = string
+  default = "pd-balanced"
+}
+
+variable "webapp_size"{
+  type = number
+  default = 100
+}
+variable "webapp_name"{
+  type = string
+  default = "tf-instance"
+}
+variable "webapp_machine_type"{
+  type = string
+  default = "e2-standard-2"
+}
+
+variable "webapp_zone"{
+  type = string
+  default = "us-east1-b"
+}
+
+variable "ingress_source_ranges" {
+  type = list(any) 
+  default = ["0.0.0.0/0"]
+  
+}
+
+variable "route_gateway"{
+  type = string
+  default = "default-internet-gateway"
+}

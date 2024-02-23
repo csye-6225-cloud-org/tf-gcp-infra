@@ -8,10 +8,10 @@ terraform {
 }
 
 provider "google" {
-  # credentials = "/Users/anuraag/.config/gcloud/application_default_credentials.json"
-  credentials = "gcp-creds.json"
-  project = var.gcp_project
-  region  = var.region
+  credentials = "/Users/anuraag/.config/gcloud/application_default_credentials.json"
+  # credentials = "gcp-creds.json"
+  project     = var.gcp_project
+  region      = var.region
 }
 
 resource "google_compute_network" "vpc_network" {
@@ -44,65 +44,65 @@ resource "google_compute_route" "network-route" {
   name             = "internet-route-${count.index + 1}"
   dest_range       = var.route_destination
   network          = google_compute_network.vpc_network.*.name[count.index]
-  next_hop_gateway = "default-internet-gateway"
+  next_hop_gateway = var.route_gateway
   priority         = 100
 }
 
 resource "google_compute_firewall" "internet_ingress_firewall_deny" {
-  count = length(var.vpc_names)
+  count    = length(var.vpc_names)
   priority = 101
-  name    = "internet-ingress-firewall-deny-${count.index + 1}"
-  network = google_compute_network.vpc_network.*.name[count.index]
+  name     = "internet-ingress-firewall-deny-${count.index + 1}"
+  network  = google_compute_network.vpc_network.*.name[count.index]
   deny {
     protocol = "all"
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
-  source_ranges = ["0.0.0.0/0"]
-  target_tags = ["webapp-server"]
+  source_ranges = var.ingress_source_ranges
+  target_tags   = var.webapp_tags
 }
 
 resource "google_compute_firewall" "internet_ingress_firewall_allow" {
-  count = length(var.vpc_names)
+  count    = length(var.vpc_names)
   priority = 100
-  name    = "internet-ingress-firewall-allow-${count.index + 1}"
-  network = google_compute_network.vpc_network.*.name[count.index]
+  name     = "internet-ingress-firewall-allow-${count.index + 1}"
+  network  = google_compute_network.vpc_network.*.name[count.index]
   allow {
     protocol = "tcp"
     ports    = ["8080", "22"]
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
-  source_ranges = ["0.0.0.0/0"]
-  target_tags = ["webapp-server"]
+  source_ranges = var.ingress_source_ranges
+  target_tags   = var.webapp_tags
 }
 
 resource "google_compute_instance" "tf_instance" {
-  name         = "tf-instance"
-  machine_type = "e2-medium"
-  zone  = "us-east1-b"
+  name         = var.webapp_name
+  machine_type = var.webapp_machine_type
+  zone         = var.webapp_zone
 
-  tags = ["webapp-server"]
+  tags = var.webapp_tags
 
   boot_disk {
     initialize_params {
-      image = "packer-1708599626"
-      type = "pd-balanced"
-      size = 100
-      labels = {
-        # name = "webapp-server"
-        my_label = "value"
-      }
+      image = var.webapp_image
+      type  = var.webapp_type
+      size  = var.webapp_size
+      # labels = {
+      #   # name = "webapp-server"
+      #   my_label = "value"
+      # }
     }
   }
 
   network_interface {
-    network = google_compute_network.vpc_network[0].name
+    network    = google_compute_network.vpc_network[0].name
     subnetwork = google_compute_subnetwork.vpc_subnet_1[0].name
 
-    access_config {
-      // Ephemeral public IP
-    }
+    # access_config {
+    #   // Ephemeral public IP
+    # }
   }
 
   metadata_startup_script = "echo hi > /test.txt"
