@@ -8,8 +8,8 @@ terraform {
 }
 
 provider "google" {
-  credentials = "/Users/anuraag/.config/gcloud/application_default_credentials.json"
-  # credentials = "gcp-creds.json"
+  # credentials = "/Users/anuraag/.config/gcloud/application_default_credentials.json"
+  credentials = "gcp-creds.json"
   project     = var.gcp_project
   region      = var.region
 }
@@ -44,7 +44,7 @@ resource "google_compute_route" "network-route" {
   name             = "internet-route-${count.index + 1}"
   dest_range       = var.route_destination
   network          = google_compute_network.vpc_network.*.name[count.index]
-  next_hop_gateway = var.route_gateway
+  next_hop_gateway = "default-internet-gateway"
   priority         = 100
 }
 
@@ -58,8 +58,8 @@ resource "google_compute_firewall" "internet_ingress_firewall_deny" {
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
-  source_ranges = var.ingress_source_ranges
-  target_tags   = var.webapp_tags
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["webapp-server"]
 }
 
 resource "google_compute_firewall" "internet_ingress_firewall_allow" {
@@ -73,26 +73,26 @@ resource "google_compute_firewall" "internet_ingress_firewall_allow" {
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
-  source_ranges = var.ingress_source_ranges
-  target_tags   = var.webapp_tags
+  source_ranges = ["0.0.0.0/0"]
+  target_tags   = ["webapp-server"]
 }
 
 resource "google_compute_instance" "tf_instance" {
-  name         = var.webapp_name
-  machine_type = var.webapp_machine_type
-  zone         = var.webapp_zone
+  name         = "tf-instance"
+  machine_type = "e2-medium"
+  zone         = "us-east1-b"
 
-  tags = var.webapp_tags
+  tags = ["webapp-server"]
 
   boot_disk {
     initialize_params {
-      image = var.webapp_image
-      type  = var.webapp_type
-      size  = var.webapp_size
-      # labels = {
-      #   # name = "webapp-server"
-      #   my_label = "value"
-      # }
+      image = "csye-6225-image-1708625609"
+      type  = "pd-balanced"
+      size  = 100
+      labels = {
+        # name = "webapp-server"
+        my_label = "value"
+      }
     }
   }
 
@@ -100,9 +100,9 @@ resource "google_compute_instance" "tf_instance" {
     network    = google_compute_network.vpc_network[0].name
     subnetwork = google_compute_subnetwork.vpc_subnet_1[0].name
 
-    # access_config {
-    #   // Ephemeral public IP
-    # }
+    access_config {
+      // Ephemeral public IP
+    }
   }
 
   metadata_startup_script = "echo hi > /test.txt"
