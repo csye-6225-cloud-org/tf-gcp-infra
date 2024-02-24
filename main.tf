@@ -69,7 +69,7 @@ resource "google_compute_firewall" "internet_ingress_firewall_allow" {
   network  = google_compute_network.vpc_network.*.name[count.index]
   allow {
     protocol = "tcp"
-    ports    = ["8080", "22"]
+    ports    = ["8080"]
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
@@ -86,7 +86,7 @@ resource "google_compute_instance" "tf_instance" {
 
   boot_disk {
     initialize_params {
-      image = "csye-6225-image-1708625609"
+      image = "csye-6225-image-1708734951"
       type  = "pd-balanced"
       size  = 100
       labels = {
