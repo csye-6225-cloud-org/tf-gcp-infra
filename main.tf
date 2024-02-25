@@ -44,7 +44,7 @@ resource "google_compute_route" "network-route" {
   name             = "internet-route-${count.index + 1}"
   dest_range       = var.route_destination
   network          = google_compute_network.vpc_network.*.name[count.index]
-  next_hop_gateway = "default-internet-gateway"
+  next_hop_gateway = var.route_gateway
   priority         = 100
 }
 
@@ -58,8 +58,8 @@ resource "google_compute_firewall" "internet_ingress_firewall_deny" {
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["webapp-server"]
+  source_ranges = var.ingress_source_ranges
+  target_tags   = var.webapp_tags
 }
 
 resource "google_compute_firewall" "internet_ingress_firewall_allow" {
@@ -73,22 +73,22 @@ resource "google_compute_firewall" "internet_ingress_firewall_allow" {
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
-  source_ranges = ["0.0.0.0/0"]
-  target_tags   = ["webapp-server"]
+  source_ranges = var.ingress_source_ranges
+  target_tags   = var.webapp_tags
 }
 
 resource "google_compute_instance" "tf_instance" {
-  name         = "tf-instance"
-  machine_type = "e2-medium"
-  zone         = "us-east1-b"
+  name         = var.webapp_name
+  machine_type = var.webapp_machine_type
+  zone         = var.webapp_zone
 
-  tags = ["webapp-server"]
+  tags = var.webapp_tags
 
   boot_disk {
     initialize_params {
-      image = "csye-6225-image-1708734951"
-      type  = "pd-balanced"
-      size  = 100
+      image = var.webapp_image
+      type  = var.webapp_type
+      size  = var.webapp_size
       labels = {
         # name = "webapp-server"
         my_label = "value"
@@ -104,7 +104,24 @@ resource "google_compute_instance" "tf_instance" {
       // Ephemeral public IP
     }
   }
+    metadata = {
+    startup-script = <<-EOT
+#!/bin/bash
 
-  metadata_startup_script = "echo hi > /test.txt"
+set -e
+
+echo "Hello World!"
+echo hi > /test.txt
+
+EOT
+  }
 
 }
+
+# resource "google_compute_global_address" "cloudsql-psconnect" {
+#   name          = "cloudsql-psconnect"
+#   address_type  = "INTERNAL"
+#   purpose       = "PRIVATE_SERVICE_CONNECT"
+#   network       =  google_compute_network.vpc_network[0].name
+#   address       = "100.100.100.105"
+# }
