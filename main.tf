@@ -69,7 +69,7 @@ resource "google_compute_firewall" "internet_ingress_firewall_allow" {
   network  = google_compute_network.vpc_network.*.name[count.index]
   allow {
     protocol = "tcp"
-    ports    = ["8080"]
+    ports    = ["8080", "22"]
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
@@ -106,22 +106,78 @@ resource "google_compute_instance" "tf_instance" {
   }
     metadata = {
     startup-script = <<-EOT
-#!/bin/bash
-
-set -e
-
-echo "Hello World!"
-echo hi > /test.txt
-
-EOT
+      #!/bin/bash
+      cd /home/pkr-gcp-user
+      echo cloudsqlpassword = ${random_password.cloudsql_password.result}, user = ${google_sql_user.cloudsql_user.name}, dbname = ${google_sql_database.cloudsql_database.name} > /test2.txt
+      echo host = ${google_compute_global_address.cloudsql_psconnect.address} > /test3.txt
+      echo hi > /hitest2.txt
+      EOT
   }
-
+  # [[ -z $(echo cloudsqlpassword = ${random_password.cloudsql_password.result}, user = ${google_sql_user.cloudsql_user.name}, dbname = ${google_sql_database.cloudsql_database.name} > /test2.txt) ]] || touch failed1.txt
+  depends_on = [google_sql_user.cloudsql_user, google_compute_subnetwork.vpc_subnet_1[0], google_compute_global_address.cloudsql_psconnect]
 }
 
-# resource "google_compute_global_address" "cloudsql-psconnect" {
-#   name          = "cloudsql-psconnect"
-#   address_type  = "INTERNAL"
-#   purpose       = "PRIVATE_SERVICE_CONNECT"
-#   network       =  google_compute_network.vpc_network[0].name
-#   address       = "100.100.100.105"
+resource "google_compute_global_address" "cloudsql_psconnect" {
+  name          = "cloudsql-psconnect"
+  address_type  = "INTERNAL"
+  purpose       = "VPC_PEERING"
+  prefix_length = 16
+  network       =  google_compute_network.vpc_network[0].id
+  # address       = "100.100.100.105"
+}
+
+resource "google_service_networking_connection" "cloudsql_connection" {
+  network       =  google_compute_network.vpc_network[0].id
+  service                 = "servicenetworking.googleapis.com"
+  reserved_peering_ranges = [google_compute_global_address.cloudsql_psconnect.name]
+}
+
+resource "google_sql_database_instance" "cloud_sql_instance" {
+  name             = "private-ip-cloud-sql-instance"
+  region           = var.region
+  database_version = "POSTGRES_10"
+
+  depends_on = [google_service_networking_connection.cloudsql_connection]
+
+  settings {
+    tier = "db-custom-1-3840"
+    ip_configuration {
+      ipv4_enabled    = "false"
+      private_network = google_compute_network.vpc_network[0].id
+      # enable_private_path_for_google_cloud_services = true - if access to bigdata etc reqd
+      # allocated_ip_range = 
+    }
+  }
+  # set `deletion_protection` to true, will ensure that one cannot accidentally delete this instance by
+  # use of Terraform whereas `deletion_protection_enabled` flag protects this instance at the GCP level.
+  deletion_protection = false
+}
+
+# resource "google_compute_network_peering_routes_config" "peering_routes_config" {
+#   # project = var.gcp_project
+#   peering              = google_service_networking_connection.cloudsql_connection.peering
+#   # peering = "servicenetworking-googleapis-com"
+#   network              = google_compute_network.vpc_network[0].id
+#   import_custom_routes = true
+#   export_custom_routes = true
+#   depends_on = [ google_service_networking_connection.cloudsql_connection ]
 # }
+
+resource "google_sql_database" "cloudsql_database" {
+  name     = "cloudsql-database"
+  instance = google_sql_database_instance.cloud_sql_instance.name
+  depends_on = [google_sql_database_instance.cloud_sql_instance]
+}
+
+resource "google_sql_user" "cloudsql_user" {
+  name     = "cloudsql-user"
+  instance = google_sql_database_instance.cloud_sql_instance.name
+  password = random_password.cloudsql_password.result
+  depends_on = [google_sql_database_instance.cloud_sql_instance]
+}
+
+resource "random_password" "cloudsql_password" {
+  length           = 16
+  special          = true
+  override_special = "!#$%&*()-_=+[]{}<>:?"
+}
