@@ -107,10 +107,14 @@ resource "google_compute_instance" "tf_instance" {
     metadata = {
     startup-script = <<-EOT
       #!/bin/bash
-      cd /home/pkr-gcp-user
-      echo cloudsqlpassword = ${random_password.cloudsql_password.result}, user = ${google_sql_user.cloudsql_user.name}, dbname = ${google_sql_database.cloudsql_database.name} > /test2.txt
-      echo host = ${google_compute_global_address.cloudsql_psconnect.address} > /test3.txt
-      echo hi > /hitest2.txt
+
+      cd /home/pkr-gcp-user/webapp
+      jq '.HOST = $newHos' --arg newHos '${google_sql_database_instance.cloud_sql_instance.private_ip_address}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
+      jq '.PASSWORD = $newPas' --arg newPas '${random_password.cloudsql_password.result}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
+      jq '.USER = $newUse' --arg newUse '${google_sql_user.cloudsql_user.name}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
+      jq '.DB = $newDb' --arg newDb '${google_sql_database.cloudsql_database.name}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
+      touch config-success.file
+
       EOT
   }
   # [[ -z $(echo cloudsqlpassword = ${random_password.cloudsql_password.result}, user = ${google_sql_user.cloudsql_user.name}, dbname = ${google_sql_database.cloudsql_database.name} > /test2.txt) ]] || touch failed1.txt
@@ -118,29 +122,28 @@ resource "google_compute_instance" "tf_instance" {
 }
 
 resource "google_compute_global_address" "cloudsql_psconnect" {
-  name          = "cloudsql-psconnect"
-  address_type  = "INTERNAL"
-  purpose       = "VPC_PEERING"
+  name          = var.cloudsql_psconnect_name
+  address_type  = var.cloudsql_psconnect_type
+  purpose       = var.cloudsql_psconnect_purpose
   prefix_length = 16
   network       =  google_compute_network.vpc_network[0].id
-  # address       = "100.100.100.105"
 }
 
 resource "google_service_networking_connection" "cloudsql_connection" {
-  network       =  google_compute_network.vpc_network[0].id
+  network         =  google_compute_network.vpc_network[0].id
   service                 = "servicenetworking.googleapis.com"
   reserved_peering_ranges = [google_compute_global_address.cloudsql_psconnect.name]
 }
 
 resource "google_sql_database_instance" "cloud_sql_instance" {
-  name             = "private-ip-cloud-sql-instance"
+  name             = var.cloud_sql_instance_name
   region           = var.region
-  database_version = "POSTGRES_10"
+  database_version = var.cloud_sql_version
 
   depends_on = [google_service_networking_connection.cloudsql_connection]
 
   settings {
-    tier = "db-custom-1-3840"
+    tier = var.cloud_sql_instance_tier
     ip_configuration {
       ipv4_enabled    = "false"
       private_network = google_compute_network.vpc_network[0].id
@@ -153,24 +156,14 @@ resource "google_sql_database_instance" "cloud_sql_instance" {
   deletion_protection = false
 }
 
-# resource "google_compute_network_peering_routes_config" "peering_routes_config" {
-#   # project = var.gcp_project
-#   peering              = google_service_networking_connection.cloudsql_connection.peering
-#   # peering = "servicenetworking-googleapis-com"
-#   network              = google_compute_network.vpc_network[0].id
-#   import_custom_routes = true
-#   export_custom_routes = true
-#   depends_on = [ google_service_networking_connection.cloudsql_connection ]
-# }
-
 resource "google_sql_database" "cloudsql_database" {
-  name     = "cloudsql-database"
+  name     = var.cloudsql_database_name
   instance = google_sql_database_instance.cloud_sql_instance.name
   depends_on = [google_sql_database_instance.cloud_sql_instance]
 }
 
 resource "google_sql_user" "cloudsql_user" {
-  name     = "cloudsql-user"
+  name     = var.cloudsql_database_user_name
   instance = google_sql_database_instance.cloud_sql_instance.name
   password = random_password.cloudsql_password.result
   depends_on = [google_sql_database_instance.cloud_sql_instance]
