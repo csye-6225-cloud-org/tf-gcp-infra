@@ -52,7 +52,7 @@ variable "webapp_tags" {
 }
 variable "webapp_image" {
   type    = string
-  default = "csye-6225-image-1708925007"
+  default = "csye-6225-image-1708929489"
 }
 variable "webapp_type" {
   type    = string
@@ -88,42 +88,62 @@ variable "route_gateway" {
   default = "default-internet-gateway"
 }
 
-variable "cloud_sql_version"{
-  type = string
+variable "cloud_sql_version" {
+  type    = string
   default = "POSTGRES_10"
 }
 
-variable "cloud_sql_instance_name"{
-  type = string
+variable "cloud_sql_instance_name" {
+  type    = string
   default = "private-ip-cloud-sql-instance"
 }
 
-variable "cloudsql_psconnect_name"{
-  type = string
+variable "cloud_sql_instance_ipv4_enabled" {
+  type    = string
+  default = false
+}
+
+variable "cloud_sql_instance_availability_type" {
+  type    = string
+  default = "REGIONAL"
+}
+
+variable "cloud_sql_instance_disk_type" {
+  type    = string
+  default = "PD_SSD"
+}
+
+variable "cloud_sql_instance_disk_size" {
+  type    = number
+  default = 100
+}
+
+variable "cloudsql_psconnect_name" {
+  type    = string
   default = "cloudsql-psconnect"
 }
 
-variable "cloudsql_psconnect_type"{
-  type = string
+variable "cloudsql_psconnect_type" {
+  type    = string
   default = "INTERNAL"
 }
 
-variable "cloudsql_psconnect_purpose"{
-  type = string
+variable "cloudsql_psconnect_purpose" {
+  type    = string
   default = "VPC_PEERING"
 }
 
-variable "cloud_sql_instance_tier"{
-  type = string
+variable "cloud_sql_instance_tier" {
+  type    = string
   default = "db-custom-1-3840"
 }
 
-variable "cloudsql_database_name"{
-  type = string
-  default = "cloudsql-database"
+variable "cloudsql_database_name" {
+  type    = string
+  default = "webapp"
 }
 
-variable "cloudsql_database_user_name"{
-  type = string
-  default = "cloudsql-user"
+variable "cloudsql_database_user_name" {
+  type    = string
+  default = "webapp"
 }

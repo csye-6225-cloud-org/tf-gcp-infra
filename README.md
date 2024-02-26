@@ -2,8 +2,9 @@
 Infrastructure as Code using terraform to set up cloud resources on GCP
 
 ## APIs enabled on GCP
-Compute Engine API
-OS Login API
+1. Compute Engine API
+2. OS Login API
+3. Service Networking API
 
 ## Instructions for setting up infra using terraform
 1. Install terraform 

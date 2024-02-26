@@ -69,7 +69,7 @@ resource "google_compute_firewall" "internet_ingress_firewall_allow" {
   network  = google_compute_network.vpc_network.*.name[count.index]
   allow {
     protocol = "tcp"
-    ports    = ["8080", "22"]
+    ports    = ["8080"]
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
@@ -104,7 +104,7 @@ resource "google_compute_instance" "tf_instance" {
       // Ephemeral public IP
     }
   }
-    metadata = {
+  metadata = {
     startup-script = <<-EOT
       #!/bin/bash
 
@@ -113,7 +113,7 @@ resource "google_compute_instance" "tf_instance" {
       jq '.PASSWORD = $newPas' --arg newPas '${random_password.cloudsql_password.result}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
       jq '.USER = $newUse' --arg newUse '${google_sql_user.cloudsql_user.name}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
       jq '.DB = $newDb' --arg newDb '${google_sql_database.cloudsql_database.name}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
-      touch config-success.file
+      sudo systemctl restart csye6225
 
       EOT
   }
@@ -126,11 +126,11 @@ resource "google_compute_global_address" "cloudsql_psconnect" {
   address_type  = var.cloudsql_psconnect_type
   purpose       = var.cloudsql_psconnect_purpose
   prefix_length = 16
-  network       =  google_compute_network.vpc_network[0].id
+  network       = google_compute_network.vpc_network[0].id
 }
 
 resource "google_service_networking_connection" "cloudsql_connection" {
-  network         =  google_compute_network.vpc_network[0].id
+  network                 = google_compute_network.vpc_network[0].id
   service                 = "servicenetworking.googleapis.com"
   reserved_peering_ranges = [google_compute_global_address.cloudsql_psconnect.name]
 }
@@ -139,17 +139,20 @@ resource "google_sql_database_instance" "cloud_sql_instance" {
   name             = var.cloud_sql_instance_name
   region           = var.region
   database_version = var.cloud_sql_version
-
-  depends_on = [google_service_networking_connection.cloudsql_connection]
+  depends_on       = [google_service_networking_connection.cloudsql_connection]
 
   settings {
     tier = var.cloud_sql_instance_tier
     ip_configuration {
-      ipv4_enabled    = "false"
+      ipv4_enabled    = var.cloud_sql_instance_ipv4_enabled
       private_network = google_compute_network.vpc_network[0].id
       # enable_private_path_for_google_cloud_services = true - if access to bigdata etc reqd
       # allocated_ip_range = 
     }
+
+    availability_type = var.cloud_sql_instance_availability_type
+    disk_type         = var.cloud_sql_instance_disk_type
+    disk_size         = var.cloud_sql_instance_disk_size
   }
   # set `deletion_protection` to true, will ensure that one cannot accidentally delete this instance by
   # use of Terraform whereas `deletion_protection_enabled` flag protects this instance at the GCP level.
@@ -157,16 +160,18 @@ resource "google_sql_database_instance" "cloud_sql_instance" {
 }
 
 resource "google_sql_database" "cloudsql_database" {
-  name     = var.cloudsql_database_name
-  instance = google_sql_database_instance.cloud_sql_instance.name
-  depends_on = [google_sql_database_instance.cloud_sql_instance]
+  name            = var.cloudsql_database_name
+  instance        = google_sql_database_instance.cloud_sql_instance.name
+  deletion_policy = "ABANDON"
+  depends_on      = [google_sql_database_instance.cloud_sql_instance]
 }
 
 resource "google_sql_user" "cloudsql_user" {
-  name     = var.cloudsql_database_user_name
-  instance = google_sql_database_instance.cloud_sql_instance.name
-  password = random_password.cloudsql_password.result
-  depends_on = [google_sql_database_instance.cloud_sql_instance]
+  name            = var.cloudsql_database_user_name
+  instance        = google_sql_database_instance.cloud_sql_instance.name
+  password        = random_password.cloudsql_password.result
+  deletion_policy = "ABANDON"
+  depends_on      = [google_sql_database_instance.cloud_sql_instance]
 }
 
 resource "random_password" "cloudsql_password" {
