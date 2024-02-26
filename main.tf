@@ -125,7 +125,7 @@ resource "google_compute_global_address" "cloudsql_psconnect" {
   name          = var.cloudsql_psconnect_name
   address_type  = var.cloudsql_psconnect_type
   purpose       = var.cloudsql_psconnect_purpose
-  prefix_length = 16
+  prefix_length = var.cloudsql_psconnect_prefix
   network       = google_compute_network.vpc_network[0].id
 }
 
@@ -162,7 +162,7 @@ resource "google_sql_database_instance" "cloud_sql_instance" {
 resource "google_sql_database" "cloudsql_database" {
   name            = var.cloudsql_database_name
   instance        = google_sql_database_instance.cloud_sql_instance.name
-  deletion_policy = "ABANDON"
+  deletion_policy = var.google_sql_deletion_policy
   depends_on      = [google_sql_database_instance.cloud_sql_instance]
 }
 
@@ -170,7 +170,7 @@ resource "google_sql_user" "cloudsql_user" {
   name            = var.cloudsql_database_user_name
   instance        = google_sql_database_instance.cloud_sql_instance.name
   password        = random_password.cloudsql_password.result
-  deletion_policy = "ABANDON"
+  deletion_policy = var.google_sql_deletion_policy
   depends_on      = [google_sql_database_instance.cloud_sql_instance]
 }
 

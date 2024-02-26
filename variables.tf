@@ -133,6 +133,11 @@ variable "cloudsql_psconnect_purpose" {
   default = "VPC_PEERING"
 }
 
+variable "cloudsql_psconnect_prefix" {
+  type    = number
+  default = 16
+}
+
 variable "cloud_sql_instance_tier" {
   type    = string
   default = "db-custom-1-3840"
@@ -146,4 +151,9 @@ variable "cloudsql_database_name" {
 variable "cloudsql_database_user_name" {
   type    = string
   default = "webapp"
+}
+
+variable "google_sql_deletion_policy" {
+  type    = string
+  default = "ABANDON"
 }
