@@ -52,7 +52,7 @@ variable "webapp_tags" {
 }
 variable "webapp_image" {
   type    = string
-  default = "csye-6225-image-1708635565"
+  default = "csye-6225-image-1708925007"
 }
 variable "webapp_type" {
   type    = string
@@ -86,4 +86,44 @@ variable "ingress_source_ranges" {
 variable "route_gateway" {
   type    = string
   default = "default-internet-gateway"
+}
+
+variable "cloud_sql_version"{
+  type = string
+  default = "POSTGRES_10"
+}
+
+variable "cloud_sql_instance_name"{
+  type = string
+  default = "private-ip-cloud-sql-instance"
+}
+
+variable "cloudsql_psconnect_name"{
+  type = string
+  default = "cloudsql-psconnect"
+}
+
+variable "cloudsql_psconnect_type"{
+  type = string
+  default = "INTERNAL"
+}
+
+variable "cloudsql_psconnect_purpose"{
+  type = string
+  default = "VPC_PEERING"
+}
+
+variable "cloud_sql_instance_tier"{
+  type = string
+  default = "db-custom-1-3840"
+}
+
+variable "cloudsql_database_name"{
+  type = string
+  default = "cloudsql-database"
+}
+
+variable "cloudsql_database_user_name"{
+  type = string
+  default = "cloudsql-user"
 }
