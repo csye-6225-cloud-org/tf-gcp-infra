@@ -69,7 +69,7 @@ resource "google_compute_firewall" "internet_ingress_firewall_allow" {
   network  = google_compute_network.vpc_network.*.name[count.index]
   allow {
     protocol = "tcp"
-    ports    = ["8080"]
+    ports    = ["8080", "22"]
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
@@ -84,6 +84,12 @@ resource "google_compute_instance" "tf_instance" {
 
   tags = var.webapp_tags
 
+  allow_stopping_for_update = true
+
+  service_account {
+    email  = google_service_account.tf_service_account.email
+    scopes = ["cloud-platform"]
+  }
   boot_disk {
     initialize_params {
       image = var.webapp_image
@@ -118,7 +124,7 @@ resource "google_compute_instance" "tf_instance" {
       EOT
   }
   # [[ -z $(echo cloudsqlpassword = ${random_password.cloudsql_password.result}, user = ${google_sql_user.cloudsql_user.name}, dbname = ${google_sql_database.cloudsql_database.name} > /test2.txt) ]] || touch failed1.txt
-  depends_on = [google_sql_user.cloudsql_user, google_compute_subnetwork.vpc_subnet_1[0], google_compute_global_address.cloudsql_psconnect]
+  depends_on = [google_sql_user.cloudsql_user, google_compute_subnetwork.vpc_subnet_1[0], google_compute_global_address.cloudsql_psconnect, google_service_account.tf_service_account]
 }
 
 resource "google_compute_global_address" "cloudsql_psconnect" {
@@ -178,4 +184,41 @@ resource "random_password" "cloudsql_password" {
   length           = 16
   special          = true
   override_special = "!#$%&*()-_=+[]{}<>:?"
+}
+
+resource "google_dns_record_set" "webapp" {
+  name = var.dns_A_record_name
+  type = var.dns_A_record_type
+  ttl  = var.dns_A_record_ttl
+
+  managed_zone = var.cloud_dns_managed_zone
+
+  rrdatas = [google_compute_instance.tf_instance.network_interface[0].access_config[0].nat_ip]
+
+  depends_on = [google_compute_instance.tf_instance]
+}
+
+resource "google_service_account" "tf_service_account" {
+  account_id   = "tf-service-account-id"
+  display_name = "TF Service Account"
+}
+
+resource "google_project_iam_binding" "iam_binding_logging" {
+  project = var.gcp_project
+  role    = "roles/logging.admin"
+
+  members = [
+    "serviceAccount:${google_service_account.tf_service_account.email}"
+  ]
+  depends_on = [google_service_account.tf_service_account]
+}
+
+resource "google_project_iam_binding" "iam_binding_monitoring" {
+  project = var.gcp_project
+  role    = "roles/monitoring.metricWriter"
+
+  members = [
+    "serviceAccount:${google_service_account.tf_service_account.email}"
+  ]
+  depends_on = [google_service_account.tf_service_account]
 }

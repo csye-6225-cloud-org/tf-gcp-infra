@@ -52,7 +52,7 @@ variable "webapp_tags" {
 }
 variable "webapp_image" {
   type    = string
-  default = "csye-6225-image-1708929489"
+  default = "csye-6225-image-1710719981"
 }
 variable "webapp_type" {
   type    = string
@@ -156,4 +156,24 @@ variable "cloudsql_database_user_name" {
 variable "google_sql_deletion_policy" {
   type    = string
   default = "ABANDON"
+}
+
+variable "dns_A_record_name" {
+  type    = string
+  default = "abathula.tech."
+}
+
+variable "dns_A_record_type" {
+  type    = string
+  default = "A"
+}
+
+variable "dns_A_record_ttl" {
+  type    = number
+  default = 300
+}
+
+variable "cloud_dns_managed_zone" {
+  type    = string
+  default = "csye-6225-dns-zone"
 }
