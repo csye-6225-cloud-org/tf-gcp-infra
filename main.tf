@@ -69,7 +69,7 @@ resource "google_compute_firewall" "internet_ingress_firewall_allow" {
   network  = google_compute_network.vpc_network.*.name[count.index]
   allow {
     protocol = "tcp"
-    ports    = ["8080", "22"]
+    ports    = ["8080"]
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
@@ -88,7 +88,7 @@ resource "google_compute_instance" "tf_instance" {
 
   service_account {
     email  = google_service_account.tf_service_account.email
-    scopes = ["cloud-platform"]
+    scopes = ["https://www.googleapis.com/auth/logging.admin", "https://www.googleapis.com/auth/monitoring.write"]
   }
   boot_disk {
     initialize_params {
@@ -199,7 +199,7 @@ resource "google_dns_record_set" "webapp" {
 }
 
 resource "google_service_account" "tf_service_account" {
-  account_id   = "tf-service-account-id"
+  account_id   = var.google_service_account
   display_name = "TF Service Account"
 }
 
