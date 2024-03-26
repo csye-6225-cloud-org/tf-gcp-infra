@@ -52,7 +52,7 @@ variable "webapp_tags" {
 }
 variable "webapp_image" {
   type    = string
-  default = "csye-6225-image-1710894323"
+  default = "csye-6225-image-1711442030"
 }
 variable "webapp_type" {
   type    = string
