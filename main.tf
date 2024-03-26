@@ -69,7 +69,7 @@ resource "google_compute_firewall" "internet_ingress_firewall_allow" {
   network  = google_compute_network.vpc_network.*.name[count.index]
   allow {
     protocol = "tcp"
-    ports    = ["8080"]
+    ports    = ["8080", "22"]
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
@@ -88,7 +88,8 @@ resource "google_compute_instance" "tf_instance" {
 
   service_account {
     email  = google_service_account.tf_service_account.email
-    scopes = ["https://www.googleapis.com/auth/logging.admin", "https://www.googleapis.com/auth/monitoring.write"]
+    # scopes = ["https://www.googleapis.com/auth/logging.admin", "https://www.googleapis.com/auth/monitoring.write"]
+    scopes = ["cloud-platform"]
   }
   boot_disk {
     initialize_params {
@@ -216,6 +217,16 @@ resource "google_project_iam_binding" "iam_binding_logging" {
 resource "google_project_iam_binding" "iam_binding_monitoring" {
   project = var.gcp_project
   role    = "roles/monitoring.metricWriter"
+
+  members = [
+    "serviceAccount:${google_service_account.tf_service_account.email}"
+  ]
+  depends_on = [google_service_account.tf_service_account]
+}
+
+resource "google_project_iam_binding" "iam_binding_pubsub" {
+  project = var.gcp_project
+  role    = "roles/pubsub.admin"
 
   members = [
     "serviceAccount:${google_service_account.tf_service_account.email}"
