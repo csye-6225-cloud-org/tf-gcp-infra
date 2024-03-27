@@ -69,7 +69,7 @@ resource "google_compute_firewall" "internet_ingress_firewall_allow" {
   network  = google_compute_network.vpc_network.*.name[count.index]
   allow {
     protocol = "tcp"
-    ports    = ["8080", "22"]
+    ports    = ["8080"]
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
