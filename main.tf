@@ -124,7 +124,6 @@ resource "google_compute_instance" "tf_instance" {
 
       EOT
   }
-  # [[ -z $(echo cloudsqlpassword = ${random_password.cloudsql_password.result}, user = ${google_sql_user.cloudsql_user.name}, dbname = ${google_sql_database.cloudsql_database.name} > /test2.txt) ]] || touch failed1.txt
   depends_on = [google_sql_user.cloudsql_user, google_compute_subnetwork.vpc_subnet_1[0], google_compute_global_address.cloudsql_psconnect, google_service_account.tf_service_account]
 }
 
@@ -201,7 +200,7 @@ resource "google_dns_record_set" "webapp" {
 
 resource "google_service_account" "tf_service_account" {
   account_id   = var.google_service_account
-  display_name = "TF Service Account"
+  display_name = "TF GCE Service Account"
 }
 
 resource "google_project_iam_binding" "iam_binding_logging" {
@@ -232,4 +231,104 @@ resource "google_project_iam_binding" "iam_binding_pubsub" {
     "serviceAccount:${google_service_account.tf_service_account.email}"
   ]
   depends_on = [google_service_account.tf_service_account]
+}
+
+resource "google_pubsub_schema" "tf_schema" {
+  name = "tf_schema"
+  type = "AVRO"
+  definition = "{\n  \"type\" : \"record\",\n  \"name\" : \"Avro\",\n  \"fields\" : [\n    {\n      \"name\" : \"username\",\n      \"type\" : \"string\"\n    }\n  ]\n}\n"
+}
+
+resource "google_pubsub_topic" "tf_topic" {
+  name = "verify_email"
+  message_retention_duration = "604800s"
+
+  depends_on = [google_pubsub_schema.tf_schema]
+  schema_settings {
+    schema = "projects/${var.gcp_project}/schemas/${google_pubsub_schema.tf_schema.name}"
+    encoding = "JSON"
+  }
+}
+
+# resource "random_id" "tf_bucket_prefix" {
+#   byte_length = 8
+# }
+
+resource "google_service_account" "tf_gcf_service_account" {
+  account_id   = "tf-gcf-service-account"
+  display_name = "TF Cloud Function Service Account"
+}
+
+# resource "google_storage_bucket" "tf_storage_bucket" {
+#   name                        = "${random_id.tf_bucket_prefix.hex}-gcf-source" # Every bucket name must be globally unique
+#   location                    = "US"
+#   uniform_bucket_level_access = true
+# }
+
+# data "archive_file" "tf_serverless_archive" {
+#   type        = "zip"
+#   output_path = "/tmp/serverless-validate.zip"
+#   source_dir  = "serverless-validate/"
+# }
+
+# resource "google_storage_bucket_object" "tf_storage_bucket_object" {
+#   name   = "serverless-validate.zip"
+#   # bucket = google_storage_bucket.tf_storage_bucket.name
+#   bucket = "csye6225-validate-email-gcf-source"
+#   source = "serverless-validate.zip"
+# }
+
+resource "google_cloudfunctions2_function" "tf_verify_email_cloud_function" {
+  name        = "verify_email_function"
+  location    = "us-east1"
+  description = "Cloud Function to verify email for csye6225"
+
+  build_config {
+    runtime     = "nodejs20"
+    entry_point = "sendValidationEmail" # Set the entry point
+    environment_variables = {
+      BUILD_CONFIG_TEST = "build_test"
+    }
+    source {
+      storage_source {
+        bucket = "csye6225-validate-email-gcf-source"
+        object = "serverless-validate.zip"
+      }
+    }
+  }
+
+  service_config {
+    max_instance_count = 1
+    min_instance_count = 0
+    available_memory   = "256M"
+    available_cpu = "1"
+    timeout_seconds    = 60
+    environment_variables = {
+      ENV_VAR_TEST = "config_test"
+      cloudDBUser = google_sql_user.cloudsql_user.name,
+      cloudDBPassword = random_password.cloudsql_password.result,
+      cloudDBHost = google_sql_database_instance.cloud_sql_instance.private_ip_address,
+      cloudDBDB = google_sql_database.cloudsql_database.name
+    }
+    ingress_settings               = "ALLOW_INTERNAL_ONLY"
+    all_traffic_on_latest_revision = true
+    service_account_email          = google_service_account.tf_gcf_service_account.email
+    vpc_connector = google_vpc_access_connector.tf_vpc_connector.name
+    vpc_connector_egress_settings = "PRIVATE_RANGES_ONLY"
+  }
+
+  event_trigger {
+    trigger_region = "us-east1"
+    event_type     = "google.cloud.pubsub.topic.v1.messagePublished"
+    pubsub_topic   = google_pubsub_topic.tf_topic.id
+    retry_policy   = "RETRY_POLICY_RETRY"
+  }
+  depends_on = [google_sql_user.cloudsql_user, google_compute_subnetwork.vpc_subnet_1[0], google_compute_global_address.cloudsql_psconnect, google_vpc_access_connector.tf_vpc_connector]
+
+}
+
+resource "google_vpc_access_connector" "tf_vpc_connector" {
+  name          = "tf-vpc-connector"
+  ip_cidr_range = "10.8.0.0/28"
+  network       = google_compute_network.vpc_network[0].id
 }

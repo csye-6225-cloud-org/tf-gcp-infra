@@ -52,7 +52,7 @@ variable "webapp_tags" {
 }
 variable "webapp_image" {
   type    = string
-  default = "csye-6225-image-1711442030"
+  default = "csye-6225-image-1711505990"
 }
 variable "webapp_type" {
   type    = string
@@ -180,5 +180,5 @@ variable "cloud_dns_managed_zone" {
 
 variable "google_service_account" {
   type = string
-  default = "tf-service-account-id"
+  default = "tf-service-account"
 }
