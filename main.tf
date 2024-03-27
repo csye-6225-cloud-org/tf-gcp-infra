@@ -88,8 +88,8 @@ resource "google_compute_instance" "tf_instance" {
 
   service_account {
     email  = google_service_account.tf_service_account.email
-    # scopes = ["https://www.googleapis.com/auth/logging.admin", "https://www.googleapis.com/auth/monitoring.write"]
-    scopes = ["cloud-platform"]
+    scopes = ["https://www.googleapis.com/auth/logging.admin", "https://www.googleapis.com/auth/monitoring.write", "https://www.googleapis.com/auth/pubsub"]
+    # scopes = ["cloud-platform"]
   }
   boot_disk {
     initialize_params {
@@ -120,11 +120,13 @@ resource "google_compute_instance" "tf_instance" {
       jq '.PASSWORD = $newPas' --arg newPas '${random_password.cloudsql_password.result}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
       jq '.USER = $newUse' --arg newUse '${google_sql_user.cloudsql_user.name}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
       jq '.DB = $newDb' --arg newDb '${google_sql_database.cloudsql_database.name}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
+      jq '.project = $newProj' --arg newProj '${var.gcp_project}'  app/config/gcp.config.json > tmp.$$.json && mv tmp.$$.json app/config/gcp.config.json
+      jq '.topic = $newTopic' --arg newTopic '${google_pubsub_topic.tf_topic.name}'  app/config/gcp.config.json > tmp.$$.json && mv tmp.$$.json app/config/gcp.config.json
       sudo systemctl restart csye6225
 
       EOT
   }
-  depends_on = [google_sql_user.cloudsql_user, google_compute_subnetwork.vpc_subnet_1[0], google_compute_global_address.cloudsql_psconnect, google_service_account.tf_service_account]
+  depends_on = [google_sql_user.cloudsql_user, google_compute_subnetwork.vpc_subnet_1[0], google_compute_global_address.cloudsql_psconnect, google_service_account.tf_service_account, google_pubsub_topic.tf_topic]
 }
 
 resource "google_compute_global_address" "cloudsql_psconnect" {
@@ -208,7 +210,8 @@ resource "google_project_iam_binding" "iam_binding_logging" {
   role    = "roles/logging.admin"
 
   members = [
-    "serviceAccount:${google_service_account.tf_service_account.email}"
+    "serviceAccount:${google_service_account.tf_service_account.email}",
+    "serviceAccount:${google_service_account.tf_gcf_service_account.email}"
   ]
   depends_on = [google_service_account.tf_service_account]
 }
@@ -218,14 +221,25 @@ resource "google_project_iam_binding" "iam_binding_monitoring" {
   role    = "roles/monitoring.metricWriter"
 
   members = [
+    "serviceAccount:${google_service_account.tf_service_account.email}",
+    "serviceAccount:${google_service_account.tf_gcf_service_account.email}"
+  ]
+  depends_on = [google_service_account.tf_service_account]
+}
+
+resource "google_project_iam_binding" "iam_binding_pubsub_p" {
+  project = var.gcp_project
+  role    = "roles/pubsub.publisher"
+
+  members = [
     "serviceAccount:${google_service_account.tf_service_account.email}"
   ]
   depends_on = [google_service_account.tf_service_account]
 }
 
-resource "google_project_iam_binding" "iam_binding_pubsub" {
+resource "google_project_iam_binding" "iam_binding_pubsub_v" {
   project = var.gcp_project
-  role    = "roles/pubsub.admin"
+  role    = "roles/pubsub.viewer"
 
   members = [
     "serviceAccount:${google_service_account.tf_service_account.email}"
@@ -234,14 +248,14 @@ resource "google_project_iam_binding" "iam_binding_pubsub" {
 }
 
 resource "google_pubsub_schema" "tf_schema" {
-  name = "tf_schema"
+  name = var.tf_schema_name
   type = "AVRO"
-  definition = "{\n  \"type\" : \"record\",\n  \"name\" : \"Avro\",\n  \"fields\" : [\n    {\n      \"name\" : \"username\",\n      \"type\" : \"string\"\n    }\n  ]\n}\n"
+  definition = var.tf_schema_definition
 }
 
 resource "google_pubsub_topic" "tf_topic" {
-  name = "verify_email"
-  message_retention_duration = "604800s"
+  name = var.tf_topic_name
+  message_retention_duration = var.tf_topic_retention
 
   depends_on = [google_pubsub_schema.tf_schema]
   schema_settings {
@@ -253,11 +267,6 @@ resource "google_pubsub_topic" "tf_topic" {
 # resource "random_id" "tf_bucket_prefix" {
 #   byte_length = 8
 # }
-
-resource "google_service_account" "tf_gcf_service_account" {
-  account_id   = "tf-gcf-service-account"
-  display_name = "TF Cloud Function Service Account"
-}
 
 # resource "google_storage_bucket" "tf_storage_bucket" {
 #   name                        = "${random_id.tf_bucket_prefix.hex}-gcf-source" # Every bucket name must be globally unique
@@ -278,31 +287,74 @@ resource "google_service_account" "tf_gcf_service_account" {
 #   source = "serverless-validate.zip"
 # }
 
+resource "google_service_account" "tf_gcf_service_account" {
+  account_id   = var.tf_gcf_service_account_name
+  display_name = "TF Cloud Functions Service Account"
+}
+
+resource "google_project_iam_binding" "iam_binding_functions_v" {
+  project = var.gcp_project
+  role    = "roles/cloudfunctions.viewer"
+
+  members = [
+    "serviceAccount:${google_service_account.tf_gcf_service_account.email}"
+  ]
+  depends_on = [google_service_account.tf_gcf_service_account]
+}
+resource "google_project_iam_binding" "iam_binding_functions_i" {
+  project = var.gcp_project
+  role    = "roles/run.invoker"
+
+  members = [
+    "serviceAccount:${google_service_account.tf_gcf_service_account.email}"
+  ]
+  depends_on = [google_service_account.tf_gcf_service_account]
+}
+resource "google_project_iam_binding" "iam_binding_functions_s" {
+  project = var.gcp_project
+  role    = "roles/pubsub.subscriber"
+
+  members = [
+    "serviceAccount:${google_service_account.tf_gcf_service_account.email}"
+  ]
+  depends_on = [google_service_account.tf_gcf_service_account]
+}
+
+# resource "google_cloudfunctions_function_iam_binding" "binding" {
+#   project = var.gcp_project
+#   region = var.region
+#   cloud_function = google_cloudfunctions2_function.tf_verify_email_cloud_function.name
+#   role = "roles/viewer"
+#   members = [
+#     "serviceAccount:${google_service_account.tf_gcf_service_account.email}"
+#   ]
+# }
+
 resource "google_cloudfunctions2_function" "tf_verify_email_cloud_function" {
-  name        = "verify_email_function"
-  location    = "us-east1"
+  name        = var.tf_function_name
+  location    = var.region
   description = "Cloud Function to verify email for csye6225"
 
   build_config {
-    runtime     = "nodejs20"
-    entry_point = "sendValidationEmail" # Set the entry point
+    runtime     = var.tf_function_runtime
+    entry_point = var.tf_function_entrypoint
     environment_variables = {
       BUILD_CONFIG_TEST = "build_test"
     }
     source {
       storage_source {
-        bucket = "csye6225-validate-email-gcf-source"
-        object = "serverless-validate.zip"
+        bucket = var.tf_serverless_source_bucket
+        object = var.tf_serverless_source_object
       }
     }
   }
 
   service_config {
-    max_instance_count = 1
-    min_instance_count = 0
-    available_memory   = "256M"
-    available_cpu = "1"
-    timeout_seconds    = 60
+    max_instance_count = var.tf_function_instance_max
+    min_instance_count = var.tf_function_instance_min
+    available_memory   = var.tf_function_instance_mem
+    available_cpu = var.tf_function_instance_cpu
+    timeout_seconds    = var.tf_function_instance_timeout
     environment_variables = {
       ENV_VAR_TEST = "config_test"
       cloudDBUser = google_sql_user.cloudsql_user.name,
@@ -310,25 +362,26 @@ resource "google_cloudfunctions2_function" "tf_verify_email_cloud_function" {
       cloudDBHost = google_sql_database_instance.cloud_sql_instance.private_ip_address,
       cloudDBDB = google_sql_database.cloudsql_database.name
     }
-    ingress_settings               = "ALLOW_INTERNAL_ONLY"
-    all_traffic_on_latest_revision = true
+    ingress_settings               = var.tf_function_ingress
+    all_traffic_on_latest_revision = var.tf_function_all_traffic
     service_account_email          = google_service_account.tf_gcf_service_account.email
     vpc_connector = google_vpc_access_connector.tf_vpc_connector.name
-    vpc_connector_egress_settings = "PRIVATE_RANGES_ONLY"
+    vpc_connector_egress_settings = var.tf_function_egress
   }
 
   event_trigger {
-    trigger_region = "us-east1"
+    trigger_region = var.region
     event_type     = "google.cloud.pubsub.topic.v1.messagePublished"
     pubsub_topic   = google_pubsub_topic.tf_topic.id
-    retry_policy   = "RETRY_POLICY_RETRY"
+    retry_policy   = var.tf_function_event_retry
+    service_account_email = google_service_account.tf_gcf_service_account.email
   }
   depends_on = [google_sql_user.cloudsql_user, google_compute_subnetwork.vpc_subnet_1[0], google_compute_global_address.cloudsql_psconnect, google_vpc_access_connector.tf_vpc_connector]
 
 }
 
 resource "google_vpc_access_connector" "tf_vpc_connector" {
-  name          = "tf-vpc-connector"
-  ip_cidr_range = "10.8.0.0/28"
+  name          = var.vpc_connector_name
+  ip_cidr_range = var.vpc_connector_cidr
   network       = google_compute_network.vpc_network[0].id
 }
