@@ -248,18 +248,18 @@ resource "google_project_iam_binding" "iam_binding_pubsub_v" {
 }
 
 resource "google_pubsub_schema" "tf_schema" {
-  name = var.tf_schema_name
-  type = "AVRO"
+  name       = var.tf_schema_name
+  type       = "AVRO"
   definition = var.tf_schema_definition
 }
 
 resource "google_pubsub_topic" "tf_topic" {
-  name = var.tf_topic_name
+  name                       = var.tf_topic_name
   message_retention_duration = var.tf_topic_retention
 
   depends_on = [google_pubsub_schema.tf_schema]
   schema_settings {
-    schema = "projects/${var.gcp_project}/schemas/${google_pubsub_schema.tf_schema.name}"
+    schema   = "projects/${var.gcp_project}/schemas/${google_pubsub_schema.tf_schema.name}"
     encoding = "JSON"
   }
 }
@@ -353,27 +353,27 @@ resource "google_cloudfunctions2_function" "tf_verify_email_cloud_function" {
     max_instance_count = var.tf_function_instance_max
     min_instance_count = var.tf_function_instance_min
     available_memory   = var.tf_function_instance_mem
-    available_cpu = var.tf_function_instance_cpu
+    available_cpu      = var.tf_function_instance_cpu
     timeout_seconds    = var.tf_function_instance_timeout
     environment_variables = {
-      ENV_VAR_TEST = "config_test"
-      cloudDBUser = google_sql_user.cloudsql_user.name,
+      ENV_VAR_TEST    = "config_test"
+      cloudDBUser     = google_sql_user.cloudsql_user.name,
       cloudDBPassword = random_password.cloudsql_password.result,
-      cloudDBHost = google_sql_database_instance.cloud_sql_instance.private_ip_address,
-      cloudDBDB = google_sql_database.cloudsql_database.name
+      cloudDBHost     = google_sql_database_instance.cloud_sql_instance.private_ip_address,
+      cloudDBDB       = google_sql_database.cloudsql_database.name
     }
     ingress_settings               = var.tf_function_ingress
     all_traffic_on_latest_revision = var.tf_function_all_traffic
     service_account_email          = google_service_account.tf_gcf_service_account.email
-    vpc_connector = google_vpc_access_connector.tf_vpc_connector.name
-    vpc_connector_egress_settings = var.tf_function_egress
+    vpc_connector                  = google_vpc_access_connector.tf_vpc_connector.name
+    vpc_connector_egress_settings  = var.tf_function_egress
   }
 
   event_trigger {
-    trigger_region = var.region
-    event_type     = "google.cloud.pubsub.topic.v1.messagePublished"
-    pubsub_topic   = google_pubsub_topic.tf_topic.id
-    retry_policy   = var.tf_function_event_retry
+    trigger_region        = var.region
+    event_type            = "google.cloud.pubsub.topic.v1.messagePublished"
+    pubsub_topic          = google_pubsub_topic.tf_topic.id
+    retry_policy          = var.tf_function_event_retry
     service_account_email = google_service_account.tf_gcf_service_account.email
   }
   depends_on = [google_sql_user.cloudsql_user, google_compute_subnetwork.vpc_subnet_1[0], google_compute_global_address.cloudsql_psconnect, google_vpc_access_connector.tf_vpc_connector]
