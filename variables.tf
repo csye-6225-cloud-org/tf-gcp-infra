@@ -52,7 +52,7 @@ variable "webapp_tags" {
 }
 variable "webapp_image" {
   type    = string
-  default = "csye-6225-image-1711505990"
+  default = "csye-6225-image-1711568608"
 }
 variable "webapp_type" {
   type    = string
@@ -181,4 +181,103 @@ variable "cloud_dns_managed_zone" {
 variable "google_service_account" {
   type = string
   default = "tf-service-account"
+}
+
+variable "vpc_connector_name" {
+  type = string
+  default = "tf-vpc-connector"
+}
+
+variable "vpc_connector_cidr" {
+  type = string
+  default = "10.8.0.0/28"
+}
+
+variable "tf_schema_name" {
+  type = string
+  default = "tf_schema"
+}
+
+variable "tf_schema_definition" {
+  type = string
+  default = "{\n  \"type\" : \"record\",\n  \"name\" : \"Avro\",\n  \"fields\" : [\n    {\n      \"name\" : \"username\",\n      \"type\" : \"string\"\n    }\n  ]\n}\n"
+}
+
+variable "tf_topic_name" {
+  type = string
+  default = "verify_email"
+}
+
+variable "tf_topic_retention" {
+  type = string
+  default = "604800s"
+}
+
+variable "tf_gcf_service_account_name" {
+  type = string
+  default = "tf-gcf-service-account"
+}
+
+variable "tf_function_name" {
+  type = string
+  default = "verify_email_function"
+}
+
+variable "tf_function_runtime" {
+  type = string
+  default = "nodejs20"
+}
+
+variable "tf_function_entrypoint" {
+  type = string
+  default = "sendValidationEmail"
+}
+
+variable "tf_function_instance_min" {
+  type = number
+  default = 0
+}
+
+variable "tf_function_instance_max" {
+  type = number
+  default = 1
+}
+variable "tf_function_instance_mem" {
+  type = string
+  default = "256M"
+}
+
+variable "tf_function_instance_cpu" {
+  type = string
+  default = "1"
+}
+
+variable "tf_function_instance_timeout" {
+  type = number
+  default = 60
+}
+variable "tf_function_ingress" {
+  type = string
+  default = "ALLOW_INTERNAL_ONLY"
+}
+variable "tf_function_all_traffic" {
+  type = bool
+  default = true
+}
+variable "tf_function_egress" {
+  type = string
+  default = "PRIVATE_RANGES_ONLY"
+}
+variable "tf_function_event_retry" {
+  type = string
+  default = "RETRY_POLICY_RETRY"
+}
+variable "tf_serverless_source_bucket" {
+  type = string
+  default = "csye6225-validate-email-gcf-source"
+}
+
+variable "tf_serverless_source_object" {
+  type = string
+  default = "serverless-validate.zip"
 }
