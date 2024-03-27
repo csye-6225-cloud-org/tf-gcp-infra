@@ -179,105 +179,105 @@ variable "cloud_dns_managed_zone" {
 }
 
 variable "google_service_account" {
-  type = string
+  type    = string
   default = "tf-service-account"
 }
 
 variable "vpc_connector_name" {
-  type = string
+  type    = string
   default = "tf-vpc-connector"
 }
 
 variable "vpc_connector_cidr" {
-  type = string
+  type    = string
   default = "10.8.0.0/28"
 }
 
 variable "tf_schema_name" {
-  type = string
+  type    = string
   default = "tf_schema"
 }
 
 variable "tf_schema_definition" {
-  type = string
+  type    = string
   default = "{\n  \"type\" : \"record\",\n  \"name\" : \"Avro\",\n  \"fields\" : [\n    {\n      \"name\" : \"username\",\n      \"type\" : \"string\"\n    }\n  ]\n}\n"
 }
 
 variable "tf_topic_name" {
-  type = string
+  type    = string
   default = "verify_email"
 }
 
 variable "tf_topic_retention" {
-  type = string
+  type    = string
   default = "604800s"
 }
 
 variable "tf_gcf_service_account_name" {
-  type = string
+  type    = string
   default = "tf-gcf-service-account"
 }
 
 variable "tf_function_name" {
-  type = string
+  type    = string
   default = "verify_email_function"
 }
 
 variable "tf_function_runtime" {
-  type = string
+  type    = string
   default = "nodejs20"
 }
 
 variable "tf_function_entrypoint" {
-  type = string
+  type    = string
   default = "sendValidationEmail"
 }
 
 variable "tf_function_instance_min" {
-  type = number
+  type    = number
   default = 0
 }
 
 variable "tf_function_instance_max" {
-  type = number
+  type    = number
   default = 1
 }
 variable "tf_function_instance_mem" {
-  type = string
+  type    = string
   default = "256M"
 }
 
 variable "tf_function_instance_cpu" {
-  type = string
+  type    = string
   default = "1"
 }
 
 variable "tf_function_instance_timeout" {
-  type = number
+  type    = number
   default = 60
 }
 variable "tf_function_ingress" {
-  type = string
+  type    = string
   default = "ALLOW_INTERNAL_ONLY"
 }
 variable "tf_function_all_traffic" {
-  type = bool
+  type    = bool
   default = true
 }
 variable "tf_function_egress" {
-  type = string
+  type    = string
   default = "PRIVATE_RANGES_ONLY"
 }
 variable "tf_function_event_retry" {
-  type = string
+  type    = string
   default = "RETRY_POLICY_RETRY"
 }
 variable "tf_serverless_source_bucket" {
-  type = string
+  type    = string
   default = "csye6225-validate-email-gcf-source"
 }
 
 variable "tf_serverless_source_object" {
-  type = string
+  type    = string
   default = "serverless-validate.zip"
 }
