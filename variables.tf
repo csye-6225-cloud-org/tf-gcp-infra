@@ -52,7 +52,7 @@ variable "webapp_tags" {
 }
 variable "webapp_image" {
   type    = string
-  default = "csye-6225-image-1711568608"
+  default = "csye-6225-image-1712123752"
 }
 variable "webapp_type" {
   type    = string
@@ -280,4 +280,145 @@ variable "tf_serverless_source_bucket" {
 variable "tf_serverless_source_object" {
   type    = string
   default = "serverless-validate.zip"
+}
+
+variable "tf_instance_template_name" {
+  type    = string
+  default = "webapp-template"
+}
+variable "tf_autoscaler_name" {
+  type    = string
+  default = "tf-region-autoscaler"
+}
+
+variable "tf_autoscaler_max_replicas" {
+  type    = number
+  default = 3
+}
+variable "tf_autoscaler_min_replicas" {
+  type    = number
+  default = 1
+}
+variable "tf_autoscaler_cooldown_period" {
+  type    = number
+  default = 60
+}
+variable "tf_autoscaler_cpu_target" {
+  type    = number
+  default = 0.05
+}
+
+variable "tf_healthcheck_name" {
+  type    = string
+  default = "tf-http-health-check"
+}
+variable "tf_healthcheck_timeout" {
+  type    = number
+  default = 10
+}
+variable "tf_healthcheck_interval" {
+  type    = number
+  default = 15
+}
+
+variable "tf_healthcheck_healthy" {
+  type    = number
+  default = 5
+}
+
+variable "tf_healthcheck_unhealthy" {
+  type    = number
+  default = 5
+}
+
+variable "tf_webapp_port" {
+  type    = string
+  default = "8080"
+}
+
+variable "tf_healthcheck_port_spec" {
+  type    = string
+  default = "USE_FIXED_PORT"
+}
+
+variable "tf_healthcheck_path" {
+  type    = string
+  default = "/healthz"
+}
+
+variable "tf_igm_name" {
+  type    = string
+  default = "webapp-igm"
+}
+variable "tf_igm_base_name" {
+  type    = string
+  default = "webapp"
+}
+variable "tf_port_name" {
+  type    = string
+  default = "webapp-port"
+}
+variable "tf_autohealing_delay" {
+  type    = number
+  default = 60
+}
+
+variable "tf_backend_name" {
+  type    = string
+  default = "webapp"
+}
+variable "tf_backend_scheme" {
+  type    = string
+  default = "EXTERNAL_MANAGED"
+}
+variable "tf_webapp_protocol" {
+  type    = string
+  default = "HTTP"
+}
+variable "tf_backend_timeout" {
+  type    = number
+  default = 10
+}
+variable "tf_backend_mode" {
+  type    = string
+  default = "UTILIZATION"
+}
+variable "tf_backend_scale" {
+  type    = number
+  default = 1.0
+}
+variable "tf_map_name" {
+  type    = string
+  default = "web-map-http"
+}
+
+variable "tf_lb_proxy_name" {
+  type    = string
+  default = "http-lb-proxy"
+}
+variable "tf_lb_forwarding_name" {
+  type    = string
+  default = "lb-forwarding-rule"
+}
+variable "tf_lb_forwarding_scheme" {
+  type    = string
+  default = "EXTERNAL_MANAGED"
+}
+
+variable "tf_webapp_ip_protocol" {
+  type    = string
+  default = "TCP"
+}
+variable "tf_lb_forwarding_port_range" {
+  type    = string
+  default = "443-443"
+}
+variable "tf_lb_ssl_cert_name" {
+  type    = string
+  default = "webapp-ssl-cert"
+}
+
+variable "tf_domain" {
+  type    = string
+  default = "abathula.tech"
 }

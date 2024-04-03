@@ -24,12 +24,12 @@ resource "google_compute_network" "vpc_network" {
 }
 
 resource "google_compute_subnetwork" "vpc_subnet_1" {
-  count         = length(var.webapp_cidr_range)
-  name          = "webapp-subnet-${count.index + 1}"
-  ip_cidr_range = var.webapp_cidr_range[count.index]
-  region        = var.region
+  count                    = length(var.webapp_cidr_range)
+  name                     = "webapp-subnet-${count.index + 1}"
+  ip_cidr_range            = var.webapp_cidr_range[count.index]
+  region                   = var.region
   private_ip_google_access = true
-  network       = google_compute_network.vpc_network.*.name[count.index]
+  network                  = google_compute_network.vpc_network.*.name[count.index]
 }
 
 resource "google_compute_subnetwork" "vpc_subnet_2" {
@@ -58,9 +58,8 @@ resource "google_compute_firewall" "internet_ingress_firewall_deny" {
     protocol = "all"
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
-  # 35.235.240.0/20
-  source_ranges = var.ingress_source_ranges
-  target_tags   = var.webapp_tags
+  source_ranges      = var.ingress_source_ranges
+  target_tags        = var.webapp_tags
 }
 
 # resource "google_compute_firewall" "internet_ingress_firewall_allow" {
@@ -73,23 +72,22 @@ resource "google_compute_firewall" "internet_ingress_firewall_deny" {
 #     ports    = ["8080"]
 #   }
 #   destination_ranges = [var.webapp_cidr_range[count.index]]
-#   # 35.235.240.0/20
 #   source_ranges = var.ingress_source_ranges
 #   target_tags   = var.webapp_tags
 # }
 
 resource "google_compute_firewall" "internet_ingress_firewall_allow_hc" {
-  count    = length(var.vpc_names)
-  priority = 100
-  name     = "internet-ingress-firewall-allow-hc-${count.index + 1}"
-  network  = google_compute_network.vpc_network.*.name[count.index]
+  count     = length(var.vpc_names)
+  priority  = 100
+  name      = "internet-ingress-firewall-allow-hc-${count.index + 1}"
+  network   = google_compute_network.vpc_network.*.name[count.index]
   direction = "INGRESS"
   allow {
     protocol = "tcp"
-    ports    = ["8080"]
+    ports    = [var.tf_webapp_port]
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
-  # 35.235.240.0/20
+  # default healthcheck source ranges
   source_ranges = ["35.191.0.0/16", "130.211.0.0/22"]
   target_tags   = var.webapp_tags
 }
@@ -118,9 +116,9 @@ resource "google_compute_firewall" "internet_ingress_firewall_allow_hc" {
 # }
 
 resource "google_compute_region_instance_template" "tf_instance_template" {
-  project = var.gcp_project
-  region = var.region
-  name        = "webapp-template"
+  project     = var.gcp_project
+  region      = var.region
+  name        = var.tf_instance_template_name
   description = "This template is used to create webapp instances."
 
   tags = var.webapp_tags
@@ -139,11 +137,11 @@ resource "google_compute_region_instance_template" "tf_instance_template" {
   # }
 
   disk {
-    source_image      = var.webapp_image
-    disk_type = var.webapp_type
+    source_image = var.webapp_image
+    disk_type    = var.webapp_type
     disk_size_gb = var.webapp_size
-    auto_delete = true
-    boot        = true
+    auto_delete  = true
+    boot         = true
   }
   network_interface {
     network    = google_compute_network.vpc_network[0].name
@@ -180,51 +178,53 @@ resource "google_compute_region_instance_template" "tf_instance_template" {
 }
 
 resource "google_compute_region_autoscaler" "tf_autoscaler" {
-  name   = "tf-region-autoscaler"
+  name   = var.tf_autoscaler_name
   region = var.region
   target = google_compute_region_instance_group_manager.tf_instance_group_manager.id
 
   autoscaling_policy {
-    max_replicas    = 3
-    min_replicas    = 1
-    cooldown_period = 60
+    max_replicas    = var.tf_autoscaler_max_replicas
+    min_replicas    = var.tf_autoscaler_min_replicas
+    cooldown_period = var.tf_autoscaler_cooldown_period
 
     cpu_utilization {
-      target = 0.05
+      target = var.tf_autoscaler_cpu_target
     }
   }
+
+  depends_on = [google_compute_region_instance_group_manager.tf_instance_group_manager]
 }
 
 resource "google_compute_health_check" "tf_http_health_check" {
-  name        = "tf-http-health-check"
+  name        = var.tf_healthcheck_name
   description = "Health check via http"
 
-  timeout_sec         = 10
-  check_interval_sec = 15
-  healthy_threshold   = 5
-  unhealthy_threshold = 5
+  timeout_sec         = var.tf_healthcheck_timeout
+  check_interval_sec  = var.tf_healthcheck_interval
+  healthy_threshold   = var.tf_healthcheck_healthy
+  unhealthy_threshold = var.tf_healthcheck_unhealthy
 
   http_health_check {
     # port_name          = "webapp-port"
     # port_specification = "USE_NAMED_PORT"
-    port          = "8080"
-    port_specification = "USE_FIXED_PORT"
+    port               = var.tf_webapp_port
+    port_specification = var.tf_healthcheck_port_spec
     # host               = "1.2.3.4"
-    request_path       = "/healthz"
-    proxy_header       = "NONE"
+    request_path = var.tf_healthcheck_path
+    proxy_header = "NONE"
     # response           = "I AM HEALTHY"
   }
 
-    log_config {
+  log_config {
     enable = true
   }
 }
 
 resource "google_compute_region_instance_group_manager" "tf_instance_group_manager" {
-  name = "webapp-igm"
+  name = var.tf_igm_name
 
-  base_instance_name         = "webapp"
-  region                     = var.region
+  base_instance_name = var.tf_igm_base_name
+  region             = var.region
   # distribution_policy_zones  = ["us-central1-a", "us-central1-f"]
 
   version {
@@ -244,62 +244,69 @@ resource "google_compute_region_instance_group_manager" "tf_instance_group_manag
   # target_size  = 2
 
   named_port {
-    name = "webapp-port"
-    port = 8080
+    name = var.tf_port_name
+    port = var.tf_webapp_port
   }
 
   auto_healing_policies {
     health_check      = google_compute_health_check.tf_http_health_check.id
-    initial_delay_sec = 300
+    initial_delay_sec = var.tf_autohealing_delay
   }
+
+  depends_on = [google_compute_health_check.tf_http_health_check, google_compute_region_instance_template.tf_instance_template]
 }
 
 resource "google_compute_backend_service" "tf_webapp_backend" {
-  name                            = "webapp-backend-service"
+  name                            = var.tf_backend_name
   connection_draining_timeout_sec = 0
   health_checks                   = [google_compute_health_check.tf_http_health_check.id]
-  load_balancing_scheme           = "EXTERNAL_MANAGED"
-  port_name                       = "webapp-port"
-  protocol                        = "HTTP"
+  load_balancing_scheme           = var.tf_backend_scheme
+  port_name                       = var.tf_port_name
+  protocol                        = var.tf_webapp_protocol
   session_affinity                = "NONE"
-  timeout_sec                     = 10
+  timeout_sec                     = var.tf_backend_timeout
   log_config {
     enable = true
   }
   backend {
     group           = google_compute_region_instance_group_manager.tf_instance_group_manager.instance_group
-    balancing_mode  = "UTILIZATION"
-    capacity_scaler = 1.0
+    balancing_mode  = var.tf_backend_mode
+    capacity_scaler = var.tf_backend_scale
   }
+
+  depends_on = [google_compute_health_check.tf_http_health_check, google_compute_region_instance_group_manager.tf_instance_group_manager]
 }
 
 resource "google_compute_url_map" "http_map" {
-  name            = "web-map-http"
+  name            = var.tf_map_name
   default_service = google_compute_backend_service.tf_webapp_backend.id
+  depends_on      = [google_compute_backend_service.tf_webapp_backend]
 }
 
 resource "google_compute_target_https_proxy" "lb_proxy" {
-  name    = "http-lb-proxy"
+  name    = var.tf_lb_proxy_name
   url_map = google_compute_url_map.http_map.id
   ssl_certificates = [
     google_compute_managed_ssl_certificate.lb_ssl_cert.name
   ]
+  depends_on = [google_compute_managed_ssl_certificate.lb_ssl_cert, google_compute_url_map.http_map]
 }
 
 resource "google_compute_global_forwarding_rule" "lb_forwarding" {
-  name                  = "lb-forwarding-rule"
-  ip_protocol           = "TCP"
-  load_balancing_scheme = "EXTERNAL_MANAGED"
-  port_range            = "443-443"
+  name                  = var.tf_lb_forwarding_name
+  ip_protocol           = var.tf_webapp_ip_protocol
+  load_balancing_scheme = var.tf_lb_forwarding_scheme
+  port_range            = var.tf_lb_forwarding_port_range
   target                = google_compute_target_https_proxy.lb_proxy.id
   # ip_address            = google_compute_global_address.default.id
+
+  depends_on = [google_compute_target_https_proxy.lb_proxy]
 }
 
 resource "google_compute_managed_ssl_certificate" "lb_ssl_cert" {
-  name     = "webapp-ssl-cert"
-
+  name = var.tf_lb_ssl_cert_name
   managed {
-    domains = ["abathula.tech"]
+    domains = [var.tf_domain]
   }
 }
 
