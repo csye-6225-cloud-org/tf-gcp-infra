@@ -293,11 +293,11 @@ variable "tf_autoscaler_name" {
 
 variable "tf_autoscaler_max_replicas" {
   type    = number
-  default = 3
+  default = 6
 }
 variable "tf_autoscaler_min_replicas" {
   type    = number
-  default = 1
+  default = 3
 }
 variable "tf_autoscaler_cooldown_period" {
   type    = number
