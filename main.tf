@@ -28,6 +28,7 @@ resource "google_compute_subnetwork" "vpc_subnet_1" {
   name          = "webapp-subnet-${count.index + 1}"
   ip_cidr_range = var.webapp_cidr_range[count.index]
   region        = var.region
+  private_ip_google_access = true
   network       = google_compute_network.vpc_network.*.name[count.index]
 }
 
@@ -148,9 +149,9 @@ resource "google_compute_region_instance_template" "tf_instance_template" {
     network    = google_compute_network.vpc_network[0].name
     subnetwork = google_compute_subnetwork.vpc_subnet_1[0].name
 
-    access_config {
-      // Ephemeral public IP
-    }
+    # access_config {
+    #   // Ephemeral public IP
+    # }
   }
 
   metadata = {
