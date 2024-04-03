@@ -252,6 +252,14 @@ resource "google_compute_region_instance_group_manager" "tf_instance_group_manag
     health_check      = google_compute_health_check.tf_http_health_check.id
     initial_delay_sec = var.tf_autohealing_delay
   }
+#   update_policy {
+#   type                           = "OPPORTUNISTIC"
+#   instance_redistribution_type   = "NONE"
+#   minimal_action                 = "REPLACE"
+#   most_disruptive_allowed_action = "REPLACE"
+#   max_surge_fixed              = 2
+#   replacement_method             = "RECREATE"
+# }
 
   depends_on = [google_compute_health_check.tf_http_health_check, google_compute_region_instance_template.tf_instance_template]
 }
