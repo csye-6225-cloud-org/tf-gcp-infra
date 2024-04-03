@@ -2,7 +2,7 @@ terraform {
   required_providers {
     google = {
       source  = "hashicorp/google"
-      version = "4.51.0"
+      version = "4.84.0"
     }
   }
 }
@@ -62,47 +62,88 @@ resource "google_compute_firewall" "internet_ingress_firewall_deny" {
   target_tags   = var.webapp_tags
 }
 
-resource "google_compute_firewall" "internet_ingress_firewall_allow" {
+# resource "google_compute_firewall" "internet_ingress_firewall_allow" {
+#   count    = length(var.vpc_names)
+#   priority = 100
+#   name     = "internet-ingress-firewall-allow-${count.index + 1}"
+#   network  = google_compute_network.vpc_network.*.name[count.index]
+#   allow {
+#     protocol = "tcp"
+#     ports    = ["8080"]
+#   }
+#   destination_ranges = [var.webapp_cidr_range[count.index]]
+#   # 35.235.240.0/20
+#   source_ranges = var.ingress_source_ranges
+#   target_tags   = var.webapp_tags
+# }
+
+resource "google_compute_firewall" "internet_ingress_firewall_allow_hc" {
   count    = length(var.vpc_names)
   priority = 100
-  name     = "internet-ingress-firewall-allow-${count.index + 1}"
+  name     = "internet-ingress-firewall-allow-hc-${count.index + 1}"
   network  = google_compute_network.vpc_network.*.name[count.index]
+  direction = "INGRESS"
   allow {
     protocol = "tcp"
     ports    = ["8080"]
   }
   destination_ranges = [var.webapp_cidr_range[count.index]]
   # 35.235.240.0/20
-  source_ranges = var.ingress_source_ranges
+  source_ranges = ["35.191.0.0/16", "130.211.0.0/22"]
   target_tags   = var.webapp_tags
 }
 
-resource "google_compute_instance" "tf_instance" {
-  name         = var.webapp_name
-  machine_type = var.webapp_machine_type
-  zone         = var.webapp_zone
+# resource "google_compute_subnetwork" "vpc_subnet_lb_proxy" {
+#   name          = "lb-proxy-subnet"
+#   ip_cidr_range = "10.129.0.0/23"
+#   purpose = "REGIONAL_MANAGED_PROXY"
+#   region        = var.region
+#   network       = google_compute_network.vpc_network[0].name
+#   role = "ACTIVE"
+# }
+
+# resource "google_compute_firewall" "internet_ingress_firewall_allow_proxy" {
+#   priority = 99
+#   name     = "internet-ingress-firewall-allow-proxy"
+#   network  = google_compute_network.vpc_network[0].name
+#   allow {
+#     protocol = "tcp"
+#     ports    = ["8080", "443", "80"]
+#   }
+#   direction     = "INGRESS"
+#   destination_ranges = [var.webapp_cidr_range[0]]
+#   source_ranges = ["10.129.0.0/23"]
+#   target_tags   = var.webapp_tags
+# }
+
+resource "google_compute_region_instance_template" "tf_instance_template" {
+  project = var.gcp_project
+  region = var.region
+  name        = "webapp-template"
+  description = "This template is used to create webapp instances."
 
   tags = var.webapp_tags
 
-  allow_stopping_for_update = true
-
-  service_account {
-    email  = google_service_account.tf_service_account.email
-    scopes = ["https://www.googleapis.com/auth/logging.admin", "https://www.googleapis.com/auth/monitoring.write", "https://www.googleapis.com/auth/pubsub"]
-    # scopes = ["cloud-platform"]
-  }
-  boot_disk {
-    initialize_params {
-      image = var.webapp_image
-      type  = var.webapp_type
-      size  = var.webapp_size
-      labels = {
-        # name = "webapp-server"
-        my_label = "value"
-      }
-    }
+  labels = {
+    environment = "dev"
   }
 
+  instance_description = "Webapp instance created from tf_instance_template"
+  machine_type         = var.webapp_machine_type
+  can_ip_forward       = false
+
+  # scheduling {
+  #   automatic_restart   = true
+  #   on_host_maintenance = "MIGRATE"
+  # }
+
+  disk {
+    source_image      = var.webapp_image
+    disk_type = var.webapp_type
+    disk_size_gb = var.webapp_size
+    auto_delete = true
+    boot        = true
+  }
   network_interface {
     network    = google_compute_network.vpc_network[0].name
     subnetwork = google_compute_subnetwork.vpc_subnet_1[0].name
@@ -111,6 +152,7 @@ resource "google_compute_instance" "tf_instance" {
       // Ephemeral public IP
     }
   }
+
   metadata = {
     startup-script = <<-EOT
       #!/bin/bash
@@ -127,7 +169,190 @@ resource "google_compute_instance" "tf_instance" {
       EOT
   }
   depends_on = [google_sql_user.cloudsql_user, google_compute_subnetwork.vpc_subnet_1[0], google_compute_global_address.cloudsql_psconnect, google_service_account.tf_service_account, google_pubsub_topic.tf_topic]
+
+
+  service_account {
+    email  = google_service_account.tf_service_account.email
+    scopes = ["https://www.googleapis.com/auth/logging.admin", "https://www.googleapis.com/auth/monitoring.write", "https://www.googleapis.com/auth/pubsub"]
+    # scopes = ["cloud-platform"]
+  }
 }
+
+resource "google_compute_region_autoscaler" "tf_autoscaler" {
+  name   = "tf-region-autoscaler"
+  region = var.region
+  target = google_compute_region_instance_group_manager.tf_instance_group_manager.id
+
+  autoscaling_policy {
+    max_replicas    = 3
+    min_replicas    = 1
+    cooldown_period = 60
+
+    cpu_utilization {
+      target = 0.05
+    }
+  }
+}
+
+resource "google_compute_health_check" "tf_http_health_check" {
+  name        = "tf-http-health-check"
+  description = "Health check via http"
+
+  timeout_sec         = 10
+  check_interval_sec = 15
+  healthy_threshold   = 5
+  unhealthy_threshold = 5
+
+  http_health_check {
+    # port_name          = "webapp-port"
+    # port_specification = "USE_NAMED_PORT"
+    port          = "8080"
+    port_specification = "USE_FIXED_PORT"
+    # host               = "1.2.3.4"
+    request_path       = "/healthz"
+    proxy_header       = "NONE"
+    # response           = "I AM HEALTHY"
+  }
+
+    log_config {
+    enable = true
+  }
+}
+
+resource "google_compute_region_instance_group_manager" "tf_instance_group_manager" {
+  name = "webapp-igm"
+
+  base_instance_name         = "webapp"
+  region                     = var.region
+  # distribution_policy_zones  = ["us-central1-a", "us-central1-f"]
+
+  version {
+    instance_template = google_compute_region_instance_template.tf_instance_template.id
+  }
+
+  # all_instances_config {
+  #   metadata = {
+  #     metadata_key = "metadata_value"
+  #   }
+  #   labels = {
+  #     label_key = "label_value"
+  #   }
+  # }
+
+  # target_pools = [google_compute_target_pool.appserver.id]
+  # target_size  = 2
+
+  named_port {
+    name = "webapp-port"
+    port = 8080
+  }
+
+  auto_healing_policies {
+    health_check      = google_compute_health_check.tf_http_health_check.id
+    initial_delay_sec = 300
+  }
+}
+
+resource "google_compute_backend_service" "tf_webapp_backend" {
+  name                            = "webapp-backend-service"
+  connection_draining_timeout_sec = 0
+  health_checks                   = [google_compute_health_check.tf_http_health_check.id]
+  load_balancing_scheme           = "EXTERNAL_MANAGED"
+  port_name                       = "webapp-port"
+  protocol                        = "HTTP"
+  session_affinity                = "NONE"
+  timeout_sec                     = 10
+  log_config {
+    enable = true
+  }
+  backend {
+    group           = google_compute_region_instance_group_manager.tf_instance_group_manager.instance_group
+    balancing_mode  = "UTILIZATION"
+    capacity_scaler = 1.0
+  }
+}
+
+resource "google_compute_url_map" "http_map" {
+  name            = "web-map-http"
+  default_service = google_compute_backend_service.tf_webapp_backend.id
+}
+
+resource "google_compute_target_https_proxy" "lb_proxy" {
+  name    = "http-lb-proxy"
+  url_map = google_compute_url_map.http_map.id
+  ssl_certificates = [
+    google_compute_managed_ssl_certificate.lb_ssl_cert.name
+  ]
+}
+
+resource "google_compute_global_forwarding_rule" "lb_forwarding" {
+  name                  = "lb-forwarding-rule"
+  ip_protocol           = "TCP"
+  load_balancing_scheme = "EXTERNAL_MANAGED"
+  port_range            = "443-443"
+  target                = google_compute_target_https_proxy.lb_proxy.id
+  # ip_address            = google_compute_global_address.default.id
+}
+
+resource "google_compute_managed_ssl_certificate" "lb_ssl_cert" {
+  name     = "webapp-ssl-cert"
+
+  managed {
+    domains = ["abathula.tech"]
+  }
+}
+
+# resource "google_compute_instance" "tf_instance" {
+#   name         = var.webapp_name
+#   machine_type = var.webapp_machine_type
+#   zone         = var.webapp_zone
+
+#   tags = var.webapp_tags
+
+#   allow_stopping_for_update = true
+
+#   service_account {
+#     email  = google_service_account.tf_service_account.email
+#     scopes = ["https://www.googleapis.com/auth/logging.admin", "https://www.googleapis.com/auth/monitoring.write", "https://www.googleapis.com/auth/pubsub"]
+#     # scopes = ["cloud-platform"]
+#   }
+#   boot_disk {
+#     initialize_params {
+#       image = var.webapp_image
+#       type  = var.webapp_type
+#       size  = var.webapp_size
+#       labels = {
+#         # name = "webapp-server"
+#         my_label = "value"
+#       }
+#     }
+#   }
+
+#   network_interface {
+#     network    = google_compute_network.vpc_network[0].name
+#     subnetwork = google_compute_subnetwork.vpc_subnet_1[0].name
+
+#     access_config {
+#       // Ephemeral public IP
+#     }
+#   }
+#   metadata = {
+#     startup-script = <<-EOT
+#       #!/bin/bash
+
+#       cd /home/pkr-gcp-user/webapp
+#       jq '.HOST = $newHos' --arg newHos '${google_sql_database_instance.cloud_sql_instance.private_ip_address}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
+#       jq '.PASSWORD = $newPas' --arg newPas '${random_password.cloudsql_password.result}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
+#       jq '.USER = $newUse' --arg newUse '${google_sql_user.cloudsql_user.name}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
+#       jq '.DB = $newDb' --arg newDb '${google_sql_database.cloudsql_database.name}'  app/config/db.config.json > tmp.$$.json && mv tmp.$$.json app/config/db.config.json
+#       jq '.project = $newProj' --arg newProj '${var.gcp_project}'  app/config/gcp.config.json > tmp.$$.json && mv tmp.$$.json app/config/gcp.config.json
+#       jq '.topic = $newTopic' --arg newTopic '${google_pubsub_topic.tf_topic.name}'  app/config/gcp.config.json > tmp.$$.json && mv tmp.$$.json app/config/gcp.config.json
+#       sudo systemctl restart csye6225
+
+#       EOT
+#   }
+#   depends_on = [google_sql_user.cloudsql_user, google_compute_subnetwork.vpc_subnet_1[0], google_compute_global_address.cloudsql_psconnect, google_service_account.tf_service_account, google_pubsub_topic.tf_topic]
+# }
 
 resource "google_compute_global_address" "cloudsql_psconnect" {
   name          = var.cloudsql_psconnect_name
@@ -195,9 +420,9 @@ resource "google_dns_record_set" "webapp" {
 
   managed_zone = var.cloud_dns_managed_zone
 
-  rrdatas = [google_compute_instance.tf_instance.network_interface[0].access_config[0].nat_ip]
+  rrdatas = [google_compute_global_forwarding_rule.lb_forwarding.ip_address]
 
-  depends_on = [google_compute_instance.tf_instance]
+  depends_on = [google_compute_global_forwarding_rule.lb_forwarding]
 }
 
 resource "google_service_account" "tf_service_account" {
