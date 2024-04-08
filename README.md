@@ -7,6 +7,7 @@ Infrastructure as Code using terraform to set up cloud resources on GCP
 3. Service Networking API
 4. Cloud Logging API
 5. Stackdriver Monitoring API
+6. Key Management Service API
 
 ## Instructions for setting up infra using terraform
 1. Install terraform 
