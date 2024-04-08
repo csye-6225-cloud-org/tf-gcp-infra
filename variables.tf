@@ -190,7 +190,7 @@ variable "vpc_connector_name" {
 
 variable "vpc_connector_cidr" {
   type    = string
-  default = "10.8.0.0/28"
+  default = "192.168.0.0/28"
 }
 
 variable "tf_schema_name" {
@@ -274,7 +274,7 @@ variable "tf_function_event_retry" {
 }
 variable "tf_serverless_source_bucket" {
   type    = string
-  default = "csye6225-validate-email-gcf-source"
+  default = "csye6225-validate-email-gcf-source-encrypted"
 }
 
 variable "tf_serverless_source_object" {
