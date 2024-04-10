@@ -125,10 +125,10 @@ resource "google_kms_key_ring" "tf_keyring" {
 }
 
 resource "google_kms_crypto_key" "tf_key_gce" {
-  name     = "tf-key-gce-${random_id.key_prefix.hex}"
-  key_ring = google_kms_key_ring.tf_keyring.id
-  purpose  = "ENCRYPT_DECRYPT"
-  rotation_period = "2592000s"
+  name            = "tf-key-gce-${random_id.key_prefix.hex}"
+  key_ring        = google_kms_key_ring.tf_keyring.id
+  purpose         = "ENCRYPT_DECRYPT"
+  rotation_period = var.key_rotation_period
 
   version_template {
     algorithm = "GOOGLE_SYMMETRIC_ENCRYPTION"
@@ -136,10 +136,10 @@ resource "google_kms_crypto_key" "tf_key_gce" {
 }
 
 resource "google_kms_crypto_key" "tf_key_sql" {
-  name     = "tf-key-sql-${random_id.key_prefix.hex}"
-  key_ring = google_kms_key_ring.tf_keyring.id
-  purpose  = "ENCRYPT_DECRYPT"
-  rotation_period = "2592000s"
+  name            = "tf-key-sql-${random_id.key_prefix.hex}"
+  key_ring        = google_kms_key_ring.tf_keyring.id
+  purpose         = "ENCRYPT_DECRYPT"
+  rotation_period = var.key_rotation_period
 
   version_template {
     algorithm = "GOOGLE_SYMMETRIC_ENCRYPTION"
@@ -147,10 +147,10 @@ resource "google_kms_crypto_key" "tf_key_sql" {
 }
 
 resource "google_kms_crypto_key" "tf_key_gcs" {
-  name     = "tf-key-gcs-${random_id.key_prefix.hex}"
-  key_ring = google_kms_key_ring.tf_keyring.id
-  purpose  = "ENCRYPT_DECRYPT"
-  rotation_period = "2592000s"
+  name            = "tf-key-gcs-${random_id.key_prefix.hex}"
+  key_ring        = google_kms_key_ring.tf_keyring.id
+  purpose         = "ENCRYPT_DECRYPT"
+  rotation_period = var.key_rotation_period
 
   version_template {
     algorithm = "GOOGLE_SYMMETRIC_ENCRYPTION"
@@ -160,7 +160,7 @@ resource "google_kms_crypto_key" "tf_key_gcs" {
 data "google_project" "current_project" {
 }
 locals {
-    gce_service_account = "service-${data.google_project.current_project.number}@compute-system.iam.gserviceaccount.com"
+  gce_service_account = "service-${data.google_project.current_project.number}@compute-system.iam.gserviceaccount.com"
 }
 
 resource "google_kms_crypto_key_iam_binding" "gce_kms_binding" {
@@ -313,14 +313,14 @@ resource "google_compute_region_instance_group_manager" "tf_instance_group_manag
     health_check      = google_compute_health_check.tf_http_health_check.id
     initial_delay_sec = var.tf_autohealing_delay
   }
-#   update_policy {
-#   type                           = "OPPORTUNISTIC"
-#   instance_redistribution_type   = "NONE"
-#   minimal_action                 = "REPLACE"
-#   most_disruptive_allowed_action = "REPLACE"
-#   max_surge_fixed              = 2
-#   replacement_method             = "RECREATE"
-# }
+  #   update_policy {
+  #   type                           = "OPPORTUNISTIC"
+  #   instance_redistribution_type   = "NONE"
+  #   minimal_action                 = "REPLACE"
+  #   most_disruptive_allowed_action = "REPLACE"
+  #   max_surge_fixed              = 2
+  #   replacement_method             = "RECREATE"
+  # }
 
   depends_on = [google_compute_health_check.tf_http_health_check, google_compute_region_instance_template.tf_instance_template]
 }
@@ -447,7 +447,7 @@ resource "google_service_networking_connection" "cloudsql_connection" {
 
 resource "google_project_service_identity" "gcp_sa_cloud_sql" {
   provider = google-beta
-  project = var.gcp_project
+  project  = var.gcp_project
   service  = "sqladmin.googleapis.com"
 }
 
@@ -595,19 +595,19 @@ resource "google_kms_crypto_key_iam_binding" "gcs_kms_binding" {
   crypto_key_id = google_kms_crypto_key.tf_key_gcs.id
   role          = "roles/cloudkms.cryptoKeyEncrypterDecrypter"
 
-  members = ["serviceAccount:${data.google_storage_project_service_account.gcs_account.email_address}"]
-  depends_on = [ google_kms_crypto_key.tf_key_gcs, data.google_storage_project_service_account.gcs_account ]
+  members    = ["serviceAccount:${data.google_storage_project_service_account.gcs_account.email_address}"]
+  depends_on = [google_kms_crypto_key.tf_key_gcs, data.google_storage_project_service_account.gcs_account]
 }
 
 resource "google_storage_bucket" "tf_storage_bucket" {
   name                        = "${random_id.tf_bucket_prefix.hex}-gcf-source" # Every bucket name must be globally unique
   location                    = "us-east1"
   uniform_bucket_level_access = true
-  public_access_prevention = "enforced"
+  public_access_prevention    = "enforced"
   encryption {
     default_kms_key_name = google_kms_crypto_key.tf_key_gcs.id
   }
-  depends_on = [ random_id.tf_bucket_prefix, google_kms_crypto_key_iam_binding.gcs_kms_binding ]
+  depends_on = [random_id.tf_bucket_prefix, google_kms_crypto_key_iam_binding.gcs_kms_binding]
 }
 
 data "archive_file" "tf_serverless_archive" {
@@ -620,8 +620,8 @@ resource "google_storage_bucket_object" "tf_storage_bucket_object" {
   name   = "serverless-validate.zip"
   bucket = google_storage_bucket.tf_storage_bucket.name
   # bucket = "csye6225-validate-email-gcf-source"
-  source = "serverless-validate.zip"
-  depends_on = [ data.archive_file.tf_serverless_archive, google_storage_bucket.tf_storage_bucket ]
+  source     = "serverless-validate.zip"
+  depends_on = [data.archive_file.tf_serverless_archive, google_storage_bucket.tf_storage_bucket]
 }
 
 resource "google_service_account" "tf_gcf_service_account" {

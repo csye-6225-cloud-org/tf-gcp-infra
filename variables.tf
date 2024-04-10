@@ -52,7 +52,7 @@ variable "webapp_tags" {
 }
 variable "webapp_image" {
   type    = string
-  default = "csye-6225-image-1712123752"
+  default = "csye-6225-image-1712746731"
 }
 variable "webapp_type" {
   type    = string
@@ -421,4 +421,9 @@ variable "tf_lb_ssl_cert_name" {
 variable "tf_domain" {
   type    = string
   default = "abathula.tech"
+}
+
+variable "key_rotation_period" {
+  type    = string
+  default = "2592000s"
 }
